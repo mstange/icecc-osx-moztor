@@ -8,6 +8,12 @@
 /* Bug report URL. */
 #define BUG_REPORT_URL "http://llvm.org/bugs/"
 
+/* Default C++ stdlib to use. */
+#define CLANG_DEFAULT_CXX_STDLIB ""
+
+/* Default runtime library to use. */
+#define CLANG_DEFAULT_RTLIB ""
+
 /* Default OpenMP runtime used by -fopenmp. */
 #define CLANG_DEFAULT_OPENMP_RUNTIME "libomp"
 
@@ -21,7 +27,7 @@
 #define C_INCLUDE_DIRS ""
 
 /* Default <path> to all compiler invocations for --sysroot=<path>. */
-#define DEFAULT_SYSROOT ""
+#define DEFAULT_SYSROOT "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 
 /* Directory where gcc is installed. */
 #define GCC_INSTALL_PREFIX ""
@@ -29,10 +35,19 @@
 /* Define if we have libxml2 */
 #define CLANG_HAVE_LIBXML 1
 
+/* Define if we have sys/resource.h (rlimits) */
+#define CLANG_HAVE_RLIMITS 1
+
 /* The LLVM product name and version */
-#define BACKEND_PACKAGE_STRING "LLVM 3.8.0"
+#define BACKEND_PACKAGE_STRING "LLVM 4.0.0svn"
 
 /* Linker version detected at compile time. */
-#define HOST_LINK_VERSION "264.3.102"
+#define HOST_LINK_VERSION "274.1"
+
+/* pass --build-id to ld */
+/* #undef ENABLE_LINKER_BUILD_ID */
+
+/* enable x86 relax relocations by default */
+#define ENABLE_X86_RELAX_RELOCATIONS 0
 
 #endif

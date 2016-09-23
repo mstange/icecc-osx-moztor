@@ -15,10 +15,8 @@
 #ifndef LLVM_DEBUGINFO_DICONTEXT_H
 #define LLVM_DEBUGINFO_DICONTEXT_H
 
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Object/ObjectFile.h"
-#include "llvm/Object/RelocVisitor.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DataTypes.h"
 #include <string>
@@ -43,6 +41,10 @@ struct DILineInfo {
   }
   bool operator!=(const DILineInfo &RHS) const {
     return !(*this == RHS);
+  }
+  bool operator<(const DILineInfo &RHS) const {
+    return std::tie(FileName, FunctionName, Line, Column) <
+           std::tie(RHS.FileName, RHS.FunctionName, RHS.Line, RHS.Column);
   }
 };
 
@@ -126,6 +128,7 @@ enum DIDumpType {
   DIDT_AppleNamespaces,
   DIDT_AppleObjC,
   DIDT_CUIndex,
+  DIDT_GdbIndex,
   DIDT_TUIndex,
 };
 
@@ -140,7 +143,8 @@ public:
   DIContext(DIContextKind K) : Kind(K) {}
   virtual ~DIContext() {}
 
-  virtual void dump(raw_ostream &OS, DIDumpType DumpType = DIDT_All) = 0;
+  virtual void dump(raw_ostream &OS, DIDumpType DumpType = DIDT_All,
+                    bool DumpEH = false) = 0;
 
   virtual DILineInfo getLineInfoForAddress(uint64_t Address,
       DILineInfoSpecifier Specifier = DILineInfoSpecifier()) = 0;
