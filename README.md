@@ -95,43 +95,43 @@ First, prepare the Linux compiler bundle:
 2. You also need clone or update the clang subrepo at `llvm/tools/clang`:
 
    ```
-cd llvm/tools
-svn co http://llvm.org/svn/llvm-project/cfe/trunk clang
-cd ../..
-```
+   cd llvm/tools
+   svn co http://llvm.org/svn/llvm-project/cfe/trunk clang
+   cd ../..
+   ```
 
 3. Build clang. This should be done in a `build` directory next to the `llvm`
    directory, using CMake.
-  Here are the commands I used to do this. I'm specifying `~/code/clang_darwin_on_linux/ `
-  as the install path. I also have icecream compiler wrapper scripts in `~/.bin/`,
-  so I'm using an existing icecream setup on the Linux machine to compile clang.
+   Here are the commands I used to do this. I'm specifying `~/code/clang_darwin_on_linux/ `
+   as the install path. I also have icecream compiler wrapper scripts in `~/.bin/`,
+   so I'm using an existing icecream setup on the Linux machine to compile clang.
 
-   ```
-mkdir build
-cd build
-CC=~/.bin/gcc CXX=~/.bin/g++ cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-apple-darwin16.0.0 -DCMAKE_INSTALL_PREFIX:PATH=~/code/clang_darwin_on_linux/ ../llvm
-ninja -j100 && ninja install
-```
+    ```
+    mkdir build
+    cd build
+    CC=~/.bin/gcc CXX=~/.bin/g++ cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-apple-darwin16.0.0 -DCMAKE_INSTALL_PREFIX:PATH=~/code/clang_darwin_on_linux/      ../llvm
+    ninja -j100 && ninja install
+    ```
 
 4. Create the `clang_darwin_on_linux` package using the `icecc-create-env` tool from the [mozilla-osx branch of Benoit's icecream repo](https://github.com/bgirard/icecream/):
 
-	1. Prepare the `icecc-create-env` tool (you only need to do this the first time you follow these steps):
+   1. Prepare the `icecc-create-env` tool (you only need to do this the first time you follow these steps):
 
-		```
-git clone -b mozilla-osx https://github.com/bgirard/icecream/
-cd icecream/
-./autogen.sh
-CC=~/.bin/gcc CXX=~/.bin/g++ ./configure
-make -j100
-chmod +x client/icecc-create-env
-```
+      ```
+      git clone -b mozilla-osx https://github.com/bgirard/icecream/
+      cd icecream/
+      ./autogen.sh
+      CC=~/.bin/gcc CXX=~/.bin/g++ ./configure
+      make -j100
+      chmod +x client/icecc-create-env
+      ```
 
-	2. Create the package:
+   2. Create the package:
 
-		```
-./client/icecc-create-env --clang ~/code/clang_darwin_on_linux/bin/clang $PWD/compilerwrapper/compilerwrapper
-```
-		This will create a file named `somelonghash.tar.gz` in the current directory.
+      ```
+      ./client/icecc-create-env --clang ~/code/clang_darwin_on_linux/bin/clang $PWD/compilerwrapper/compilerwrapper
+      ```
+      This will create a file named `somelonghash.tar.gz` in the current directory.
 
 5. Transfer the `somelonghash.tar.gz ` file to your Mac and save it in the root directory of this repository, right next to this readme file. Keep the filename that `icecc-create-env` chose, **do not rename the file to the same name as the old, existing package**. (The filename is used as a disambiguation key by icecream. If there exist different toolchains with the same name, then they will collide on the builders.)
 6. Adjust the `cc` and `c++` wrapper scripts in the same directory to point to the new file.
@@ -144,9 +144,9 @@ Now it's time to compile clang for macOS.
 3. Build clang on macOS. I used this command:
 
    ```
-cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-apple-darwin16.0.0 -DDEFAULT_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/ -DCMAKE_INSTALL_PREFIX:PATH=~/code/clang_darwin_on_darwin/ ../llvm
-ninja -j100 && ninja install
-```
+   cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-apple-darwin16.0.0 -DDEFAULT_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/ -DCMAKE_INSTALL_PREFIX:PATH=~/code/clang_darwin_on_darwin/ ../llvm
+   ninja -j100 && ninja install
+   ```
 4. Replace the `clang_darwin_on_darwin` directory in this directory with the one that the previous build command produced in `~/code/`.
 
 This concludes the update. You can commit and push your changes now.
