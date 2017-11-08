@@ -16,7 +16,7 @@ Clone this repository, this will take a while because it contains a binary copy
 of a clang toolchain (which is a gross thing to keep in git, I know)
 
 ```bash
-$ git clone https://github.com/mystor/icecc-osx-moztor ~/icecream
+$ git clone https://github.com/mstange/icecc-osx-moztor ~/icecream
 ```
 
 Install the daemon. This will create a launchd plist which will be run on startup.
@@ -75,3 +75,75 @@ or `telnet` into the server,
 $ telnet 10.242.24.68 8766
 ```
 
+## Updating the clang bundle
+
+The clang bundle in this repo was built from llvm svn revision 317612.
+
+Here are the steps you need to follow if you want to update the bundle to a
+different revision:
+
+You need both a Linux machine and a macOS machine in order to prepare a clang bundle.
+That's because you want to have one build of clang that can run both on your own
+machine (which is macOS) and one which can be distributed to the icecc worker machines
+(which run Linux). These need to produce the same code, so they should be built
+from the same llvm revision.
+
+First, prepare the Linux compiler bundle:
+
+1. [Clone the llvm repo](http://clang.llvm.org/get_started.html) on Linux using `svn co http://llvm.org/svn/llvm-project/llvm/trunk llvm`,
+   or `svn up` your existing clone.
+2. You also need clone or update the clang subrepo at `llvm/tools/clang`:
+   ```
+cd llvm/tools
+svn co http://llvm.org/svn/llvm-project/cfe/trunk clang
+cd ../..
+```
+3. Build clang. This should be done in a `build` directory next to the `llvm`
+   directory, using CMake.
+  Here are the commands I used to do this. I'm specifying `~/code/clang_darwin_on_linux/ `
+  as the install path. I also have icecream compiler wrapper scripts in `~/.bin/`,
+  so I'm using an existing icecream setup on the Linux machine to compile clang.
+   ```
+mkdir build
+cd build
+CC=~/.bin/gcc CXX=~/.bin/g++ cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-apple-darwin16.0.0 -DCMAKE_INSTALL_PREFIX:PATH=~/code/clang_darwin_on_linux/ ../llvm
+ninja -j100 && ninja install
+```
+
+4. Create the `clang_darwin_on_linux` package using the `icecc-create-env` tool from the [mozilla-osx branch of Benoit's icecream repo](https://github.com/bgirard/icecream/):
+
+	1. Prepare the `icecc-create-env` tool (you only need to do this the first time you follow these steps):
+
+		```
+git clone -b mozilla-osx https://github.com/bgirard/icecream/
+cd icecream/
+./autogen.sh
+CC=~/.bin/gcc CXX=~/.bin/g++ ./configure
+make -j100
+chmod +x client/icecc-create-env
+```
+
+	2. Create the package:
+
+		```
+./client/icecc-create-env --clang ~/code/clang_darwin_on_linux/bin/clang $PWD/compilerwrapper/compilerwrapper
+```
+		This will create a file named `somelonghash.tar.gz` in the current directory.
+
+5. Transfer the `somelonghash.tar.gz ` file to your Mac and save it in the root directory of this repository, right next to this readme file. Keep the filename that `icecc-create-env` chose, **do not rename the file to the same name as the old, existing package**. (The filename is used as a disambiguation key by icecream. If there exist different toolchains with the same name, then they will collide on the builders.)
+6. Adjust the `cc` and `c++` wrapper scripts in the same directory to point to the new file.
+7. Run `svn info` in your llvm clone on Linux and note the revision number.
+
+Now it's time to compile clang for macOS.
+
+1. Clone llvm on macOS and `svn up -r ...` to the same revision.
+2. You also need the subrepos `llvm/tools/clang` and `llvm/projects/libcxx`. (The latter was not needed on Linux.)
+3. Build clang on macOS. I used this command:
+
+   ```
+cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-apple-darwin16.0.0 -DDEFAULT_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/ -DCMAKE_INSTALL_PREFIX:PATH=~/code/clang_darwin_on_darwin/ ../llvm
+ninja -j100 && ninja install
+```
+4. Replace the `clang_darwin_on_darwin` directory in this directory with the one that the previous build command produced in `~/code/`.
+
+This concludes the update. You can commit and push your changes now.
