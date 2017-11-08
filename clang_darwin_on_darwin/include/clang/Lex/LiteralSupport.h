@@ -65,6 +65,7 @@ public:
   bool isHalf : 1;          // 1.0h
   bool isFloat : 1;         // 1.0f
   bool isImaginary : 1;     // 1.0i
+  bool isFloat16 : 1;       // 1.0f16
   bool isFloat128 : 1;      // 1.0q
   uint8_t MicrosoftInteger; // Microsoft suffix extension i8, i16, i32, or i64.
 
@@ -258,6 +259,8 @@ public:
     assert(!UDSuffixBuf.empty() && "no ud-suffix");
     return UDSuffixOffset;
   }
+
+  static bool isValidUDSuffix(const LangOptions &LangOpts, StringRef Suffix);
 
 private:
   void init(ArrayRef<Token> StringToks);

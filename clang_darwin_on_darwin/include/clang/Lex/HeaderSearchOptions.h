@@ -11,11 +11,13 @@
 #define LLVM_CLANG_LEX_HEADERSEARCHOPTIONS_H
 
 #include "clang/Basic/LLVM.h"
+#include "llvm/ADT/CachedHashString.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
 #include <vector>
+#include <map>
 
 namespace clang {
 
@@ -43,7 +45,7 @@ namespace frontend {
 
 /// HeaderSearchOptions - Helper class for storing options related to the
 /// initialization of the HeaderSearch object.
-class HeaderSearchOptions : public RefCountedBase<HeaderSearchOptions> {
+class HeaderSearchOptions {
 public:
   struct Entry {
     std::string Path;
@@ -92,6 +94,9 @@ public:
 
   /// \brief The directory used for a user build.
   std::string ModuleUserBuildPath;
+
+  /// \brief The mapping of module names to prebuilt module files.
+  std::map<std::string, std::string> PrebuiltModuleFiles;
 
   /// \brief The directories used to load prebuilt module files.
   std::vector<std::string> PrebuiltModulePaths;
@@ -144,7 +149,7 @@ public:
 
   /// \brief The set of macro names that should be ignored for the purposes
   /// of computing the module hash.
-  llvm::SmallSetVector<std::string, 16> ModulesIgnoreMacros;
+  llvm::SmallSetVector<llvm::CachedHashString, 16> ModulesIgnoreMacros;
 
   /// \brief The set of user-provided virtual filesystem overlay files.
   std::vector<std::string> VFSOverlayFiles;
@@ -177,6 +182,8 @@ public:
 
   unsigned ModulesValidateDiagnosticOptions : 1;
 
+  unsigned ModulesHashContent : 1;
+
   HeaderSearchOptions(StringRef _Sysroot = "/")
       : Sysroot(_Sysroot), ModuleFormat("raw"), DisableModuleHash(0),
         ImplicitModuleMaps(0), ModuleMapFileHomeIsCwd(0),
@@ -185,8 +192,8 @@ public:
         UseBuiltinIncludes(true), UseStandardSystemIncludes(true),
         UseStandardCXXIncludes(true), UseLibcxx(false), Verbose(false),
         ModulesValidateOncePerBuildSession(false),
-        ModulesValidateSystemHeaders(false),
-        UseDebugInfo(false), ModulesValidateDiagnosticOptions(true) {}
+        ModulesValidateSystemHeaders(false), UseDebugInfo(false),
+        ModulesValidateDiagnosticOptions(true), ModulesHashContent(false) {}
 
   /// AddPath - Add the \p Path path to the specified \p Group list.
   void AddPath(StringRef Path, frontend::IncludeDirGroup Group,

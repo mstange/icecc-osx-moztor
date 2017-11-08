@@ -73,7 +73,8 @@ inline void MarkVarDeclODRUsed(VarDecl *Var,
   // Keep track of used but undefined variables.
   // FIXME: We shouldn't suppress this warning for static data members.
   if (Var->hasDefinition(SemaRef.Context) == VarDecl::DeclarationOnly &&
-      (!Var->isExternallyVisible() || Var->isInline()) &&
+      (!Var->isExternallyVisible() || Var->isInline() ||
+       SemaRef.isExternalWithNoLinkageType(Var)) &&
       !(Var->isStaticDataMember() && Var->hasInit())) {
     SourceLocation &old = SemaRef.UndefinedButUsed[Var->getCanonicalDecl()];
     if (old.isInvalid())
@@ -333,12 +334,12 @@ private:
 
 inline Sema::TypoExprState::TypoExprState() {}
 
-inline Sema::TypoExprState::TypoExprState(TypoExprState &&other) LLVM_NOEXCEPT {
+inline Sema::TypoExprState::TypoExprState(TypoExprState &&other) noexcept {
   *this = std::move(other);
 }
 
-inline Sema::TypoExprState &Sema::TypoExprState::operator=(
-    Sema::TypoExprState &&other) LLVM_NOEXCEPT {
+inline Sema::TypoExprState &Sema::TypoExprState::
+operator=(Sema::TypoExprState &&other) noexcept {
   Consumer = std::move(other.Consumer);
   DiagHandler = std::move(other.DiagHandler);
   RecoveryHandler = std::move(other.RecoveryHandler);

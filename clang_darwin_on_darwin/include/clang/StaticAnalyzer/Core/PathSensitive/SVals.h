@@ -32,6 +32,7 @@ namespace ento {
 
 class CompoundValData;
 class LazyCompoundValData;
+class PointerToMemberData;
 class ProgramState;
 class BasicValueFactory;
 class MemRegion;
@@ -39,6 +40,22 @@ class TypedValueRegion;
 class MemRegionManager;
 class ProgramStateManager;
 class SValBuilder;
+
+namespace nonloc {
+/// Sub-kinds for NonLoc values.
+enum Kind {
+#define NONLOC_SVAL(Id, Parent) Id ## Kind,
+#include "clang/StaticAnalyzer/Core/PathSensitive/SVals.def"
+};
+}
+
+namespace loc {
+/// Sub-kinds for Loc values.
+enum Kind {
+#define LOC_SVAL(Id, Parent) Id ## Kind,
+#include "clang/StaticAnalyzer/Core/PathSensitive/SVals.def"
+};
+}
 
 /// SVal - This represents a symbolic expression, which can be either
 ///  an L-value or an R-value.
@@ -74,10 +91,7 @@ public:
   template<typename T>
   T castAs() const {
     assert(T::isKind(*this));
-    T t;
-    SVal& sv = t;
-    sv = *this;
-    return t;
+    return *static_cast<const T *>(this);
   }
 
   /// \brief Convert to the specified SVal type, returning None if this SVal is
@@ -86,14 +100,8 @@ public:
   Optional<T> getAs() const {
     if (!T::isKind(*this))
       return None;
-    T t;
-    SVal& sv = t;
-    sv = *this;
-    return t;
+    return *static_cast<const T *>(this);
   }
-
-  /// BufferTy - A temporary buffer to hold a set of SVals.
-  typedef SmallVector<SVal,5> BufferTy;
 
   inline unsigned getRawKind() const { return Kind; }
   inline BaseKind getBaseKind() const { return (BaseKind) (Kind & BaseMask); }
@@ -187,6 +195,10 @@ public:
   }
 };
 
+inline raw_ostream &operator<<(raw_ostream &os, clang::ento::SVal V) {
+  V.dumpToStream(os);
+  return os;
+}
 
 class UndefinedVal : public SVal {
 public:
@@ -272,6 +284,11 @@ protected:
 public:
   void dumpToStream(raw_ostream &Out) const;
 
+  static inline bool isCompoundType(QualType T) {
+    return T->isArrayType() || T->isRecordType() ||
+           T->isComplexType() || T->isVectorType();
+  }
+
 private:
   friend class SVal;
   static bool isKind(const SVal& V) {
@@ -306,15 +323,11 @@ private:
 
 namespace nonloc {
 
-enum Kind {
-#define NONLOC_SVAL(Id, Parent) Id ## Kind,
-#include "clang/StaticAnalyzer/Core/PathSensitive/SVals.def"
-};
-
 /// \brief Represents symbolic expression.
 class SymbolVal : public NonLoc {
 public:
-  SymbolVal(SymbolRef sym) : NonLoc(SymbolValKind, sym) {}
+  SymbolVal() = delete;
+  SymbolVal(SymbolRef sym) : NonLoc(SymbolValKind, sym) { assert(sym); }
 
   SymbolRef getSymbol() const {
     return (const SymExpr*) Data;
@@ -326,7 +339,6 @@ public:
 
 private:
   friend class SVal;
-  SymbolVal() {}
   static bool isKind(const SVal& V) {
     return V.getBaseKind() == NonLocKind &&
            V.getSubKind() == SymbolValKind;
@@ -372,7 +384,11 @@ class LocAsInteger : public NonLoc {
 
   explicit LocAsInteger(const std::pair<SVal, uintptr_t> &data)
       : NonLoc(LocAsIntegerKind, &data) {
-    assert (data.first.getAs<Loc>());
+    // We do not need to represent loc::ConcreteInt as LocAsInteger,
+    // as it'd collapse into a nonloc::ConcreteInt instead.
+    assert(data.first.getBaseKind() == LocKind &&
+           (data.first.getSubKind() == loc::MemRegionValKind ||
+            data.first.getSubKind() == loc::GotoLabelKind));
   }
 
 public:
@@ -459,6 +475,51 @@ private:
   }
 };
 
+/// \brief Value representing pointer-to-member.
+///
+/// This value is qualified as NonLoc because neither loading nor storing
+/// operations are aplied to it. Instead, the analyzer uses the L-value coming
+/// from pointer-to-member applied to an object.
+/// This SVal is represented by a DeclaratorDecl which can be a member function
+/// pointer or a member data pointer and a list of CXXBaseSpecifiers. This list
+/// is required to accumulate the pointer-to-member cast history to figure out
+/// the correct subobject field.
+class PointerToMember : public NonLoc {
+  friend class ento::SValBuilder;
+
+public:
+  typedef llvm::PointerUnion<const DeclaratorDecl *,
+                             const PointerToMemberData *> PTMDataType;
+  const PTMDataType getPTMData() const {
+    return PTMDataType::getFromOpaqueValue(const_cast<void *>(Data));
+  }
+  bool isNullMemberPointer() const {
+    return getPTMData().isNull();
+  }
+  const DeclaratorDecl *getDecl() const;
+  template<typename AdjustedDecl>
+  const AdjustedDecl* getDeclAs() const {
+    return dyn_cast_or_null<AdjustedDecl>(getDecl());
+  }
+  typedef llvm::ImmutableList<const CXXBaseSpecifier *>::iterator iterator;
+  iterator begin() const;
+  iterator end() const;
+
+private:
+  explicit PointerToMember(const PTMDataType D)
+    : NonLoc(PointerToMemberKind, D.getOpaqueValue()) {}
+  friend class SVal;
+  PointerToMember() {}
+  static bool isKind(const SVal& V) {
+    return V.getBaseKind() == NonLocKind &&
+           V.getSubKind() == PointerToMemberKind;
+  }
+
+  static bool isKind(const NonLoc& V) {
+    return V.getSubKind() == PointerToMemberKind;
+  }
+};
+
 } // end namespace ento::nonloc
 
 //==------------------------------------------------------------------------==//
@@ -467,14 +528,11 @@ private:
 
 namespace loc {
 
-enum Kind {
-#define LOC_SVAL(Id, Parent) Id ## Kind,
-#include "clang/StaticAnalyzer/Core/PathSensitive/SVals.def"
-};
-
 class GotoLabel : public Loc {
 public:
-  explicit GotoLabel(LabelDecl *Label) : Loc(GotoLabelKind, Label) {}
+  explicit GotoLabel(const LabelDecl *Label) : Loc(GotoLabelKind, Label) {
+    assert(Label);
+  }
 
   const LabelDecl *getLabel() const {
     return static_cast<const LabelDecl*>(Data);
@@ -495,7 +553,9 @@ private:
 
 class MemRegionVal : public Loc {
 public:
-  explicit MemRegionVal(const MemRegion* r) : Loc(MemRegionValKind, r) {}
+  explicit MemRegionVal(const MemRegion* r) : Loc(MemRegionValKind, r) {
+    assert(r);
+  }
 
   /// \brief Get the underlining region.
   const MemRegion* getRegion() const {
@@ -563,11 +623,6 @@ private:
 } // end clang namespace
 
 namespace llvm {
-static inline raw_ostream &operator<<(raw_ostream &os,
-                                            clang::ento::SVal V) {
-  V.dumpToStream(os);
-  return os;
-}
 
 template <typename T> struct isPodLike;
 template <> struct isPodLike<clang::ento::SVal> {

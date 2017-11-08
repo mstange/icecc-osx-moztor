@@ -49,6 +49,20 @@
 Record.push_back(SA->getInterrupt());
     break;
   }
+  case attr::AVRInterrupt: {
+    const auto *SA = cast<AVRInterruptAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    break;
+  }
+  case attr::AVRSignal: {
+    const auto *SA = cast<AVRSignalAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    break;
+  }
   case attr::AbiTag: {
     const auto *SA = cast<AbiTagAttr>(A);
     Record.push_back(A->isImplicit());
@@ -121,6 +135,23 @@ Record.push_back(SA->getInterrupt());
       Record.AddTypeSourceInfo(SA->getAlignmentType());
     break;
   }
+  case attr::AllocAlign: {
+    const auto *SA = cast<AllocAlignAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.push_back(SA->getParamIndex());
+    break;
+  }
+  case attr::AllocSize: {
+    const auto *SA = cast<AllocSizeAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.push_back(SA->getElemSizeParam());
+    Record.push_back(SA->getNumElemsParam());
+    break;
+  }
   case attr::AlwaysInline: {
     const auto *SA = cast<AlwaysInlineAttr>(A);
     Record.push_back(SA->isInherited());
@@ -145,6 +176,13 @@ Record.push_back(SA->getInterrupt());
   }
   case attr::AnyX86Interrupt: {
     const auto *SA = cast<AnyX86InterruptAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    break;
+  }
+  case attr::AnyX86NoCallerSavedRegisters: {
+    const auto *SA = cast<AnyX86NoCallerSavedRegistersAttr>(A);
     Record.push_back(SA->isInherited());
     Record.push_back(A->isImplicit());
     Record.push_back(A->getSpellingListIndex());
@@ -181,7 +219,9 @@ Record.push_back(SA->getInterrupt());
     Record.push_back(SA->isInherited());
     Record.push_back(A->isImplicit());
     Record.push_back(A->getSpellingListIndex());
-    Record.AddStmt(SA->getExpr());
+    Record.push_back(SA->args_size());
+    for (auto &Val : SA->args())
+      Record.AddStmt(Val);
     break;
   }
   case attr::AssertExclusiveLock: {
@@ -434,6 +474,13 @@ Record.push_back(SA->getDefaultState());
     Record.push_back(A->getSpellingListIndex());
     break;
   }
+  case attr::Convergent: {
+    const auto *SA = cast<ConvergentAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    break;
+  }
   case attr::DLLExport: {
     const auto *SA = cast<DLLExportAttr>(A);
     Record.push_back(SA->isInherited());
@@ -465,6 +512,18 @@ Record.push_back(SA->getDefaultState());
     Record.push_back(SA->getPriority());
     break;
   }
+  case attr::DiagnoseIf: {
+    const auto *SA = cast<DiagnoseIfAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.AddStmt(SA->getCond());
+    Record.AddString(SA->getMessage());
+Record.push_back(SA->getDiagnosticType());
+    Record.push_back(SA->getArgDependent());
+    Record.AddDeclRef(SA->getParent());
+    break;
+  }
   case attr::DisableTailCalls: {
     const auto *SA = cast<DisableTailCallsAttr>(A);
     Record.push_back(SA->isInherited());
@@ -488,6 +547,14 @@ Record.push_back(SA->getDefaultState());
     Record.AddString(SA->getMessage());
     break;
   }
+  case attr::EnumExtensibility: {
+    const auto *SA = cast<EnumExtensibilityAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+Record.push_back(SA->getExtensibility());
+    break;
+  }
   case attr::ExclusiveTrylockFunction: {
     const auto *SA = cast<ExclusiveTrylockFunctionAttr>(A);
     Record.push_back(SA->isInherited());
@@ -497,6 +564,16 @@ Record.push_back(SA->getDefaultState());
     Record.push_back(SA->args_size());
     for (auto &Val : SA->args())
       Record.AddStmt(Val);
+    break;
+  }
+  case attr::ExternalSourceSymbol: {
+    const auto *SA = cast<ExternalSourceSymbolAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.AddString(SA->getLanguage());
+    Record.AddString(SA->getDefinedIn());
+    Record.push_back(SA->getGeneratedDeclaration());
     break;
   }
   case attr::FallThrough: {
@@ -739,6 +816,13 @@ Record.push_back(SA->getState());
     Record.push_back(A->getSpellingListIndex());
     break;
   }
+  case attr::MicroMips: {
+    const auto *SA = cast<MicroMipsAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    break;
+  }
   case attr::MinSize: {
     const auto *SA = cast<MinSizeAttr>(A);
     Record.push_back(SA->isInherited());
@@ -759,6 +843,20 @@ Record.push_back(SA->getState());
     Record.push_back(A->isImplicit());
     Record.push_back(A->getSpellingListIndex());
 Record.push_back(SA->getInterrupt());
+    break;
+  }
+  case attr::MipsLongCall: {
+    const auto *SA = cast<MipsLongCallAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    break;
+  }
+  case attr::MipsShortCall: {
+    const auto *SA = cast<MipsShortCallAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
     break;
   }
   case attr::Mode: {
@@ -838,6 +936,11 @@ Record.push_back(SA->getInterrupt());
     Record.push_back(A->getSpellingListIndex());
     break;
   }
+  case attr::NoEscape: {
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    break;
+  }
   case attr::NoInline: {
     const auto *SA = cast<NoInlineAttr>(A);
     Record.push_back(SA->isInherited());
@@ -847,6 +950,13 @@ Record.push_back(SA->getInterrupt());
   }
   case attr::NoInstrumentFunction: {
     const auto *SA = cast<NoInstrumentFunctionAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    break;
+  }
+  case attr::NoMicroMips: {
+    const auto *SA = cast<NoMicroMipsAttr>(A);
     Record.push_back(SA->isInherited());
     Record.push_back(A->isImplicit());
     Record.push_back(A->getSpellingListIndex());
@@ -912,6 +1022,13 @@ Record.push_back(SA->getInterrupt());
     Record.push_back(SA->isInherited());
     Record.push_back(A->isImplicit());
     Record.push_back(A->getSpellingListIndex());
+    break;
+  }
+  case attr::OMPCaptureKind: {
+    const auto *SA = cast<OMPCaptureKindAttr>(A);
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.push_back(SA->getCaptureKind());
     break;
   }
   case attr::OMPCaptureNoInit: {
@@ -1080,9 +1197,24 @@ Record.push_back(SA->getFamily());
     Record.push_back(A->getSpellingListIndex());
     break;
   }
+  case attr::ObjCSubclassingRestricted: {
+    const auto *SA = cast<ObjCSubclassingRestrictedAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    break;
+  }
   case attr::OpenCLAccess: {
     Record.push_back(A->isImplicit());
     Record.push_back(A->getSpellingListIndex());
+    break;
+  }
+  case attr::OpenCLIntelReqdSubGroupSize: {
+    const auto *SA = cast<OpenCLIntelReqdSubGroupSizeAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.push_back(SA->getSubGroupSize());
     break;
   }
   case attr::OpenCLKernel: {
@@ -1168,6 +1300,38 @@ Record.push_back(SA->getParamState());
 Record.push_back(SA->getPCS());
     break;
   }
+  case attr::PragmaClangBSSSection: {
+    const auto *SA = cast<PragmaClangBSSSectionAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.AddString(SA->getName());
+    break;
+  }
+  case attr::PragmaClangDataSection: {
+    const auto *SA = cast<PragmaClangDataSectionAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.AddString(SA->getName());
+    break;
+  }
+  case attr::PragmaClangRodataSection: {
+    const auto *SA = cast<PragmaClangRodataSectionAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.AddString(SA->getName());
+    break;
+  }
+  case attr::PragmaClangTextSection: {
+    const auto *SA = cast<PragmaClangTextSectionAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.AddString(SA->getName());
+    break;
+  }
   case attr::PreserveAll: {
     const auto *SA = cast<PreserveAllAttr>(A);
     Record.push_back(SA->isInherited());
@@ -1199,6 +1363,13 @@ Record.push_back(SA->getPCS());
   }
   case attr::Pure: {
     const auto *SA = cast<PureAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    break;
+  }
+  case attr::RegCall: {
+    const auto *SA = cast<RegCallAttr>(A);
     Record.push_back(SA->isInherited());
     Record.push_back(A->isImplicit());
     Record.push_back(A->getSpellingListIndex());
@@ -1330,6 +1501,15 @@ Record.push_back(SA->getNewState());
     Record.push_back(SA->isInherited());
     Record.push_back(A->isImplicit());
     Record.push_back(A->getSpellingListIndex());
+    break;
+  }
+  case attr::Suppress: {
+    const auto *SA = cast<SuppressAttr>(A);
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.push_back(SA->diagnosticIdentifiers_size());
+    for (auto &Val : SA->diagnosticIdentifiers())
+      Record.AddString(Val);
     break;
   }
   case attr::SwiftCall: {
@@ -1559,6 +1739,14 @@ Record.push_back(SA->getVisibility());
     Record.push_back(SA->isInherited());
     Record.push_back(A->isImplicit());
     Record.push_back(A->getSpellingListIndex());
+    break;
+  }
+  case attr::XRayLogArgs: {
+    const auto *SA = cast<XRayLogArgsAttr>(A);
+    Record.push_back(SA->isInherited());
+    Record.push_back(A->isImplicit());
+    Record.push_back(A->getSpellingListIndex());
+    Record.push_back(SA->getArgumentCount());
     break;
   }
   }

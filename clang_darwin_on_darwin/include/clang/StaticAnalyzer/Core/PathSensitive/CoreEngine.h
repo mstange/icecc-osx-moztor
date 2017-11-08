@@ -16,7 +16,7 @@
 #define LLVM_CLANG_STATICANALYZER_CORE_PATHSENSITIVE_COREENGINE_H
 
 #include "clang/AST/Expr.h"
-#include "clang/Analysis/AnalysisContext.h"
+#include "clang/Analysis/AnalysisDeclContext.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/BlockCounter.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/ExplodedGraph.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/FunctionSummary.h"
@@ -109,7 +109,8 @@ private:
   CoreEngine(const CoreEngine &) = delete;
   void operator=(const CoreEngine &) = delete;
 
-  ExplodedNode *generateCallExitBeginNode(ExplodedNode *N);
+  ExplodedNode *generateCallExitBeginNode(ExplodedNode *N,
+                                          const ReturnStmt *RS);
 
 public:
   /// Construct a CoreEngine object to analyze the provided CFG.
@@ -172,7 +173,7 @@ public:
 
   /// \brief enqueue the nodes corresponding to the end of function onto the
   /// end of path / work list.
-  void enqueueEndOfFunction(ExplodedNodeSet &Set);
+  void enqueueEndOfFunction(ExplodedNodeSet &Set, const ReturnStmt *RS);
 
   /// \brief Enqueue a single node created as a result of statement processing.
   void enqueueStmtNode(ExplodedNode *N, const CFGBlock *Block, unsigned Idx);

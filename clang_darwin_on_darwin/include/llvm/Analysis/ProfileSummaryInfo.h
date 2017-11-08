@@ -27,6 +27,9 @@
 #include <memory>
 
 namespace llvm {
+class BasicBlock;
+class BlockFrequencyInfo;
+class CallSite;
 class ProfileSummary;
 /// \brief Analysis providing profile information.
 ///
@@ -42,23 +45,71 @@ class ProfileSummaryInfo {
 private:
   Module &M;
   std::unique_ptr<ProfileSummary> Summary;
-  void computeSummary();
+  bool computeSummary();
   void computeThresholds();
   // Count thresholds to answer isHotCount and isColdCount queries.
   Optional<uint64_t> HotCountThreshold, ColdCountThreshold;
+  // True if the working set size of the code is considered huge,
+  // because the number of profile counts required to reach the hot
+  // percentile is above a huge threshold.
+  Optional<bool> HasHugeWorkingSetSize;
 
 public:
   ProfileSummaryInfo(Module &M) : M(M) {}
   ProfileSummaryInfo(ProfileSummaryInfo &&Arg)
       : M(Arg.M), Summary(std::move(Arg.Summary)) {}
+
+  /// \brief Returns true if profile summary is available.
+  bool hasProfileSummary() { return computeSummary(); }
+
+  /// \brief Returns true if module \c M has sample profile.
+  bool hasSampleProfile() {
+    return hasProfileSummary() &&
+           Summary->getKind() == ProfileSummary::PSK_Sample;
+  }
+
+  /// \brief Returns true if module \c M has instrumentation profile.
+  bool hasInstrumentationProfile() {
+    return hasProfileSummary() &&
+           Summary->getKind() == ProfileSummary::PSK_Instr;
+  }
+
+  /// Handle the invalidation of this information.
+  ///
+  /// When used as a result of \c ProfileSummaryAnalysis this method will be
+  /// called when the module this was computed for changes. Since profile
+  /// summary is immutable after it is annotated on the module, we return false
+  /// here.
+  bool invalidate(Module &, const PreservedAnalyses &,
+                  ModuleAnalysisManager::Invalidator &) {
+    return false;
+  }
+
+  /// Returns the profile count for \p CallInst.
+  Optional<uint64_t> getProfileCount(const Instruction *CallInst,
+                                     BlockFrequencyInfo *BFI);
+  /// Returns true if the working set size of the code is considered huge.
+  bool hasHugeWorkingSetSize();
+  /// \brief Returns true if \p F has hot function entry.
+  bool isFunctionEntryHot(const Function *F);
+  /// Returns true if \p F has hot function entry or hot call edge.
+  bool isFunctionHotInCallGraph(const Function *F);
+  /// \brief Returns true if \p F has cold function entry.
+  bool isFunctionEntryCold(const Function *F);
+  /// Returns true if \p F has cold function entry or cold call edge.
+  bool isFunctionColdInCallGraph(const Function *F);
   /// \brief Returns true if \p F is a hot function.
-  bool isHotFunction(const Function *F);
-  /// \brief Returns true if \p F is a cold function.
-  bool isColdFunction(const Function *F);
-  /// \brief Returns true if count \p C is considered hot.
   bool isHotCount(uint64_t C);
   /// \brief Returns true if count \p C is considered cold.
   bool isColdCount(uint64_t C);
+  /// \brief Returns true if BasicBlock \p B is considered hot.
+  bool isHotBB(const BasicBlock *B, BlockFrequencyInfo *BFI);
+  /// \brief Returns true if BasicBlock \p B is considered cold.
+  bool isColdBB(const BasicBlock *B, BlockFrequencyInfo *BFI);
+  /// \brief Returns true if CallSite \p CS is considered hot.
+  bool isHotCallSite(const CallSite &CS, BlockFrequencyInfo *BFI);
+  /// \brief Returns true if Callsite \p CS is considered cold.
+  bool isColdCallSite(const CallSite &CS, BlockFrequencyInfo *BFI);
 };
 
 /// An analysis pass based on legacy pass manager to deliver ProfileSummaryInfo.
@@ -86,21 +137,11 @@ class ProfileSummaryAnalysis
 public:
   typedef ProfileSummaryInfo Result;
 
-  ProfileSummaryAnalysis() {}
-  ProfileSummaryAnalysis(const ProfileSummaryAnalysis &Arg) {}
-  ProfileSummaryAnalysis(ProfileSummaryAnalysis &&Arg) {}
-  ProfileSummaryAnalysis &operator=(const ProfileSummaryAnalysis &RHS) {
-    return *this;
-  }
-  ProfileSummaryAnalysis &operator=(ProfileSummaryAnalysis &&RHS) {
-    return *this;
-  }
-
   Result run(Module &M, ModuleAnalysisManager &);
 
 private:
   friend AnalysisInfoMixin<ProfileSummaryAnalysis>;
-  static char PassID;
+  static AnalysisKey Key;
 };
 
 /// \brief Printer pass that uses \c ProfileSummaryAnalysis.

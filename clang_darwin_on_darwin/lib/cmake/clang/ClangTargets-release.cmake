@@ -65,6 +65,16 @@ set_target_properties(clangASTMatchers PROPERTIES
 list(APPEND _IMPORT_CHECK_TARGETS clangASTMatchers )
 list(APPEND _IMPORT_CHECK_FILES_FOR_clangASTMatchers "${_IMPORT_PREFIX}/lib/libclangASTMatchers.a" )
 
+# Import target "clangCrossTU" for configuration "Release"
+set_property(TARGET clangCrossTU APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(clangCrossTU PROPERTIES
+  IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/lib/libclangCrossTU.a"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS clangCrossTU )
+list(APPEND _IMPORT_CHECK_FILES_FOR_clangCrossTU "${_IMPORT_PREFIX}/lib/libclangCrossTU.a" )
+
 # Import target "clangSema" for configuration "Release"
 set_property(TARGET clangSema APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 set_target_properties(clangSema PROPERTIES
@@ -185,6 +195,26 @@ set_target_properties(clangToolingCore PROPERTIES
 list(APPEND _IMPORT_CHECK_TARGETS clangToolingCore )
 list(APPEND _IMPORT_CHECK_FILES_FOR_clangToolingCore "${_IMPORT_PREFIX}/lib/libclangToolingCore.a" )
 
+# Import target "clangToolingRefactor" for configuration "Release"
+set_property(TARGET clangToolingRefactor APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(clangToolingRefactor PROPERTIES
+  IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/lib/libclangToolingRefactor.a"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS clangToolingRefactor )
+list(APPEND _IMPORT_CHECK_FILES_FOR_clangToolingRefactor "${_IMPORT_PREFIX}/lib/libclangToolingRefactor.a" )
+
+# Import target "clangToolingASTDiff" for configuration "Release"
+set_property(TARGET clangToolingASTDiff APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(clangToolingASTDiff PROPERTIES
+  IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/lib/libclangToolingASTDiff.a"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS clangToolingASTDiff )
+list(APPEND _IMPORT_CHECK_FILES_FOR_clangToolingASTDiff "${_IMPORT_PREFIX}/lib/libclangToolingASTDiff.a" )
+
 # Import target "clangTooling" for configuration "Release"
 set_property(TARGET clangTooling APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 set_target_properties(clangTooling PROPERTIES
@@ -244,6 +274,61 @@ set_target_properties(clangFormat PROPERTIES
 
 list(APPEND _IMPORT_CHECK_TARGETS clangFormat )
 list(APPEND _IMPORT_CHECK_FILES_FOR_clangFormat "${_IMPORT_PREFIX}/lib/libclangFormat.a" )
+
+# Import target "clang" for configuration "Release"
+set_property(TARGET clang APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(clang PROPERTIES
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/bin/clang-6.0"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS clang )
+list(APPEND _IMPORT_CHECK_FILES_FOR_clang "${_IMPORT_PREFIX}/bin/clang-6.0" )
+
+# Import target "clang-format" for configuration "Release"
+set_property(TARGET clang-format APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(clang-format PROPERTIES
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/bin/clang-format"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS clang-format )
+list(APPEND _IMPORT_CHECK_FILES_FOR_clang-format "${_IMPORT_PREFIX}/bin/clang-format" )
+
+# Import target "clangHandleCXX" for configuration "Release"
+set_property(TARGET clangHandleCXX APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(clangHandleCXX PROPERTIES
+  IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/lib/libclangHandleCXX.a"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS clangHandleCXX )
+list(APPEND _IMPORT_CHECK_FILES_FOR_clangHandleCXX "${_IMPORT_PREFIX}/lib/libclangHandleCXX.a" )
+
+# Import target "clang-import-test" for configuration "Release"
+set_property(TARGET clang-import-test APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(clang-import-test PROPERTIES
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/bin/clang-import-test"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS clang-import-test )
+list(APPEND _IMPORT_CHECK_FILES_FOR_clang-import-test "${_IMPORT_PREFIX}/bin/clang-import-test" )
+
+# Import target "clang-rename" for configuration "Release"
+set_property(TARGET clang-rename APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(clang-rename PROPERTIES
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/bin/clang-rename"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS clang-rename )
+list(APPEND _IMPORT_CHECK_FILES_FOR_clang-rename "${_IMPORT_PREFIX}/bin/clang-rename" )
+
+# Import target "clang-refactor" for configuration "Release"
+set_property(TARGET clang-refactor APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(clang-refactor PROPERTIES
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/bin/clang-refactor"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS clang-refactor )
+list(APPEND _IMPORT_CHECK_FILES_FOR_clang-refactor "${_IMPORT_PREFIX}/bin/clang-refactor" )
 
 # Import target "libclang" for configuration "Release"
 set_property(TARGET libclang APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)

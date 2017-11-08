@@ -38,24 +38,30 @@
 #ifndef LLVM_ANALYSIS_ALIASANALYSIS_H
 #define LLVM_ANALYSIS_ALIASANALYSIS_H
 
-#include "llvm/IR/CallSite.h"
-#include "llvm/IR/Metadata.h"
-#include "llvm/IR/PassManager.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/IR/CallSite.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <vector>
 
 namespace llvm {
-class BasicAAResult;
-class LoadInst;
-class StoreInst;
-class VAArgInst;
-class DataLayout;
-class Pass;
+
 class AnalysisUsage;
-class MemTransferInst;
-class MemIntrinsic;
+class BasicAAResult;
+class BasicBlock;
 class DominatorTree;
 class OrderedBasicBlock;
+class Value;
 
 /// The possible results of an alias query.
 ///
@@ -112,8 +118,10 @@ enum FunctionModRefLocation {
   FMRL_Nowhere = 0,
   /// Access to memory via argument pointers.
   FMRL_ArgumentPointees = 4,
+  /// Memory that is inaccessible via LLVM IR.
+  FMRL_InaccessibleMem = 8,
   /// Access to any memory.
-  FMRL_Anywhere = 8 | FMRL_ArgumentPointees
+  FMRL_Anywhere = 16 | FMRL_InaccessibleMem | FMRL_ArgumentPointees
 };
 
 /// Summary of how a function affects memory in the program.
@@ -142,6 +150,22 @@ enum FunctionModRefBehavior {
   ///
   /// This property corresponds to the IntrArgMemOnly LLVM intrinsic flag.
   FMRB_OnlyAccessesArgumentPointees = FMRL_ArgumentPointees | MRI_ModRef,
+
+  /// The only memory references in this function (if it has any) are
+  /// references of memory that is otherwise inaccessible via LLVM IR.
+  ///
+  /// This property corresponds to the LLVM IR inaccessiblememonly attribute.
+  FMRB_OnlyAccessesInaccessibleMem = FMRL_InaccessibleMem | MRI_ModRef,
+
+  /// The function may perform non-volatile loads and stores of objects
+  /// pointed to by its pointer-typed arguments, with arbitrary offsets, and
+  /// it may also perform loads and stores of memory that is otherwise
+  /// inaccessible via LLVM IR.
+  ///
+  /// This property corresponds to the LLVM IR
+  /// inaccessiblemem_or_argmemonly attribute.
+  FMRB_OnlyAccessesInaccessibleOrArgMem = FMRL_InaccessibleMem |
+                                          FMRL_ArgumentPointees | MRI_ModRef,
 
   /// This function does not perform any non-local stores or volatile loads,
   /// but may read from any memory location.
@@ -178,6 +202,20 @@ public:
     // ideally involve two pointers and no separate allocation.
     AAs.emplace_back(new Model<AAResultT>(AAResult, *this));
   }
+
+  /// Register a function analysis ID that the results aggregation depends on.
+  ///
+  /// This is used in the new pass manager to implement the invalidation logic
+  /// where we must invalidate the results aggregation if any of our component
+  /// analyses become invalid.
+  void addAADependencyID(AnalysisKey *ID) { AADeps.push_back(ID); }
+
+  /// Handle invalidation events in the new pass manager.
+  ///
+  /// The aggregation is invalidated if any of the underlying analyses is
+  /// invalidated.
+  bool invalidate(Function &F, const PreservedAnalyses &PA,
+                  FunctionAnalysisManager::Invalidator &Inv);
 
   //===--------------------------------------------------------------------===//
   /// \name Alias Queries
@@ -339,6 +377,26 @@ public:
     return (MRB & MRI_ModRef) && (MRB & FMRL_ArgumentPointees);
   }
 
+  /// Checks if functions with the specified behavior are known to read and
+  /// write at most from memory that is inaccessible from LLVM IR.
+  static bool onlyAccessesInaccessibleMem(FunctionModRefBehavior MRB) {
+    return !(MRB & FMRL_Anywhere & ~FMRL_InaccessibleMem);
+  }
+
+  /// Checks if functions with the specified behavior are known to potentially
+  /// read or write from memory that is inaccessible from LLVM IR.
+  static bool doesAccessInaccessibleMem(FunctionModRefBehavior MRB) {
+    return (MRB & MRI_ModRef) && (MRB & FMRL_InaccessibleMem);
+  }
+
+  /// Checks if functions with the specified behavior are known to read and
+  /// write at most from memory that is inaccessible from LLVM IR or objects
+  /// pointed to by their pointer-typed arguments (with arbitrary offsets).
+  static bool onlyAccessesInaccessibleOrArgMem(FunctionModRefBehavior MRB) {
+    return !(MRB & FMRL_Anywhere &
+             ~(FMRL_InaccessibleMem | FMRL_ArgumentPointees));
+  }
+
   /// getModRefInfo (for call sites) - Return information about whether
   /// a particular call site modifies or reads the specified memory location.
   ModRefInfo getModRefInfo(ImmutableCallSite CS, const MemoryLocation &Loc);
@@ -391,11 +449,7 @@ public:
 
   /// getModRefInfo (for fences) - Return information about whether
   /// a particular store modifies or reads the specified memory location.
-  ModRefInfo getModRefInfo(const FenceInst *S, const MemoryLocation &Loc) {
-    // Conservatively correct.  (We could possibly be a bit smarter if
-    // Loc is a alloca that doesn't escape.)
-    return MRI_ModRef;
-  }
+  ModRefInfo getModRefInfo(const FenceInst *S, const MemoryLocation &Loc);
 
   /// getModRefInfo (for fences) - A convenience wrapper.
   ModRefInfo getModRefInfo(const FenceInst *S, const Value *P, uint64_t Size) {
@@ -452,35 +506,33 @@ public:
     return getModRefInfo(I, MemoryLocation(P, Size));
   }
 
-  /// Check whether or not an instruction may read or write memory (without
-  /// regard to a specific location).
+  /// Check whether or not an instruction may read or write the optionally
+  /// specified memory location.
   ///
-  /// For function calls, this delegates to the alias-analysis specific
-  /// call-site mod-ref behavior queries. Otherwise it delegates to the generic
-  /// mod ref information query without a location.
-  ModRefInfo getModRefInfo(const Instruction *I) {
-    if (auto CS = ImmutableCallSite(I)) {
-      auto MRB = getModRefBehavior(CS);
-      if ((MRB & MRI_ModRef) == MRI_ModRef)
-        return MRI_ModRef;
-      if (MRB & MRI_Ref)
-        return MRI_Ref;
-      if (MRB & MRI_Mod)
-        return MRI_Mod;
-      return MRI_NoModRef;
-    }
-
-    return getModRefInfo(I, MemoryLocation());
-  }
-
-  /// Check whether or not an instruction may read or write the specified
-  /// memory location.
   ///
   /// An instruction that doesn't read or write memory may be trivially LICM'd
   /// for example.
   ///
-  /// This primarily delegates to specific helpers above.
-  ModRefInfo getModRefInfo(const Instruction *I, const MemoryLocation &Loc) {
+  /// For function calls, this delegates to the alias-analysis specific
+  /// call-site mod-ref behavior queries. Otherwise it delegates to the specific
+  /// helpers above.
+  ModRefInfo getModRefInfo(const Instruction *I,
+                           const Optional<MemoryLocation> &OptLoc) {
+    if (OptLoc == None) {
+      if (auto CS = ImmutableCallSite(I)) {
+        auto MRB = getModRefBehavior(CS);
+        if ((MRB & MRI_ModRef) == MRI_ModRef)
+          return MRI_ModRef;
+        if (MRB & MRI_Ref)
+          return MRI_Ref;
+        if (MRB & MRI_Mod)
+          return MRI_Mod;
+        return MRI_NoModRef;
+      }
+    }
+
+    const MemoryLocation &Loc = OptLoc.getValueOr(MemoryLocation());
+
     switch (I->getOpcode()) {
     case Instruction::VAArg:  return getModRefInfo((const VAArgInst*)I, Loc);
     case Instruction::Load:   return getModRefInfo((const LoadInst*)I,  Loc);
@@ -564,6 +616,7 @@ public:
 
 private:
   class Concept;
+
   template <typename T> class Model;
 
   template <typename T> friend class AAResultBase;
@@ -571,11 +624,13 @@ private:
   const TargetLibraryInfo &TLI;
 
   std::vector<std::unique_ptr<Concept>> AAs;
+
+  std::vector<AnalysisKey *> AADeps;
 };
 
 /// Temporary typedef for legacy code that uses a generic \c AliasAnalysis
 /// pointer or reference.
-typedef AAResults AliasAnalysis;
+using AliasAnalysis = AAResults;
 
 /// A private abstract base class describing the concept of an individual alias
 /// analysis implementation.
@@ -656,7 +711,7 @@ public:
   explicit Model(AAResultT &Result, AAResults &AAR) : Result(Result) {
     Result.setAAResults(&AAR);
   }
-  ~Model() override {}
+  ~Model() override = default;
 
   void setAAResults(AAResults *NewAAR) override { Result.setAAResults(NewAAR); }
 
@@ -766,7 +821,7 @@ protected:
     }
   };
 
-  explicit AAResultBase() {}
+  explicit AAResultBase() = default;
 
   // Provide all the copy and move constructors so that derived types aren't
   // constrained.
@@ -815,7 +870,6 @@ public:
   }
 };
 
-
 /// Return true if this pointer is returned by a noalias function.
 bool isNoAliasCall(const Value *V);
 
@@ -852,21 +906,7 @@ bool isIdentifiedFunctionLocal(const Value *V);
 /// ensure the analysis itself is registered with its AnalysisManager.
 class AAManager : public AnalysisInfoMixin<AAManager> {
 public:
-  typedef AAResults Result;
-
-  // This type has value semantics. We have to spell these out because MSVC
-  // won't synthesize them.
-  AAManager() {}
-  AAManager(AAManager &&Arg) : ResultGetters(std::move(Arg.ResultGetters)) {}
-  AAManager(const AAManager &Arg) : ResultGetters(Arg.ResultGetters) {}
-  AAManager &operator=(AAManager &&RHS) {
-    ResultGetters = std::move(RHS.ResultGetters);
-    return *this;
-  }
-  AAManager &operator=(const AAManager &RHS) {
-    ResultGetters = RHS.ResultGetters;
-    return *this;
-  }
+  using Result = AAResults;
 
   /// Register a specific AA result.
   template <typename AnalysisT> void registerFunctionAnalysis() {
@@ -887,7 +927,8 @@ public:
 
 private:
   friend AnalysisInfoMixin<AAManager>;
-  static char PassID;
+
+  static AnalysisKey Key;
 
   SmallVector<void (*)(Function &F, FunctionAnalysisManager &AM,
                        AAResults &AAResults),
@@ -898,15 +939,19 @@ private:
                                       FunctionAnalysisManager &AM,
                                       AAResults &AAResults) {
     AAResults.addAAResult(AM.template getResult<AnalysisT>(F));
+    AAResults.addAADependencyID(AnalysisT::ID());
   }
 
   template <typename AnalysisT>
   static void getModuleAAResultImpl(Function &F, FunctionAnalysisManager &AM,
                                     AAResults &AAResults) {
-    auto &MAM =
-        AM.getResult<ModuleAnalysisManagerFunctionProxy>(F).getManager();
-    if (auto *R = MAM.template getCachedResult<AnalysisT>(*F.getParent()))
+    auto &MAMProxy = AM.getResult<ModuleAnalysisManagerFunctionProxy>(F);
+    auto &MAM = MAMProxy.getManager();
+    if (auto *R = MAM.template getCachedResult<AnalysisT>(*F.getParent())) {
       AAResults.addAAResult(*R);
+      MAMProxy
+          .template registerOuterAnalysisInvalidation<AnalysisT, AAManager>();
+    }
   }
 };
 
@@ -953,6 +998,6 @@ AAResults createLegacyPMAAResults(Pass &P, Function &F, BasicAAResult &BAR);
 /// sure the analyses required by \p createLegacyPMAAResults are available.
 void getAAResultsAnalysisUsage(AnalysisUsage &AU);
 
-} // End llvm namespace
+} // end namespace llvm
 
-#endif
+#endif // LLVM_ANALYSIS_ALIASANALYSIS_H

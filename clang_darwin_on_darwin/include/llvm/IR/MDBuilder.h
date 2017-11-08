@@ -15,7 +15,9 @@
 #ifndef LLVM_IR_MDBUILDER_H
 #define LLVM_IR_MDBUILDER_H
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/DataTypes.h"
 #include <utility>
 
@@ -63,8 +65,14 @@ public:
   /// Return metadata specifying that a branch or switch is unpredictable.
   MDNode *createUnpredictable();
 
-  /// Return metadata containing the entry count for a function.
-  MDNode *createFunctionEntryCount(uint64_t Count);
+  /// Return metadata containing the entry \p Count for a function, and the
+  /// GUIDs stored in \p Imports that need to be imported for sample PGO, to
+  /// enable the same inlines as the profiled optimized binary
+  MDNode *createFunctionEntryCount(uint64_t Count,
+                                   const DenseSet<GlobalValue::GUID> *Imports);
+
+  /// Return metadata containing the section prefix for a function.
+  MDNode *createFunctionSectionPrefix(StringRef Prefix);
 
   //===------------------------------------------------------------------===//
   // Range metadata.
@@ -75,6 +83,14 @@ public:
 
   /// \brief Return metadata describing the range [Lo, Hi).
   MDNode *createRange(Constant *Lo, Constant *Hi);
+
+  //===------------------------------------------------------------------===//
+  // Callees metadata.
+  //===------------------------------------------------------------------===//
+
+  /// \brief Return metadata indicating the possible callees of indirect
+  /// calls.
+  MDNode *createCallees(ArrayRef<Function *> Callees);
 
   //===------------------------------------------------------------------===//
   // AA metadata.
@@ -157,6 +173,9 @@ public:
   /// base type, access type and offset relative to the base type.
   MDNode *createTBAAStructTagNode(MDNode *BaseType, MDNode *AccessType,
                                   uint64_t Offset, bool IsConstant = false);
+
+  /// \brief Return metadata containing an irreducible loop header weight.
+  MDNode *createIrrLoopHeaderWeight(uint64_t Weight);
 };
 
 } // end namespace llvm

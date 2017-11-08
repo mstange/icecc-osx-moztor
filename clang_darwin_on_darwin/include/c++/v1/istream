@@ -162,16 +162,18 @@ template <class charT, class traits, class T>
 #include <__config>
 #include <ostream>
 
-#include <__undef_min_max>
-
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #pragma GCC system_header
 #endif
 
+_LIBCPP_PUSH_MACROS
+#include <__undef_macros>
+
+
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 template <class _CharT, class _Traits>
-class _LIBCPP_TYPE_VIS_ONLY basic_istream
+class _LIBCPP_TEMPLATE_VIS basic_istream
     : virtual public basic_ios<_CharT, _Traits>
 {
     streamsize __gc_;
@@ -189,12 +191,11 @@ public:
     { this->init(__sb); }
     virtual ~basic_istream();
 protected:
-#ifndef _LIBCPP_HAS_NO_RVALUE_REFERENCES
+#ifndef _LIBCPP_CXX03_LANG
     inline _LIBCPP_INLINE_VISIBILITY
     basic_istream(basic_istream&& __rhs);
-#endif
+
     // 27.7.1.1.2 Assign/swap:
-#ifndef _LIBCPP_HAS_NO_RVALUE_REFERENCES
     inline _LIBCPP_INLINE_VISIBILITY
     basic_istream& operator=(basic_istream&& __rhs);
 #endif
@@ -205,19 +206,14 @@ protected:
       basic_ios<char_type, traits_type>::swap(__rhs);
     }
 
-#if _LIBCPP_STD_VER > 11
-#ifndef _LIBCPP_HAS_NO_DELETED_FUNCTIONS
+#ifndef _LIBCPP_CXX03_LANG
     basic_istream           (const basic_istream& __rhs) = delete;
     basic_istream& operator=(const basic_istream& __rhs) = delete;
-#else
-    basic_istream           (const basic_istream& __rhs); // not defined
-    basic_istream& operator=(const basic_istream& __rhs); // not defined
-#endif
 #endif
 public:
 
     // 27.7.1.1.3 Prefix/suffix:
-    class _LIBCPP_TYPE_VIS_ONLY sentry;
+    class _LIBCPP_TEMPLATE_VIS sentry;
 
     // 27.7.1.2 Formatted input:
     inline _LIBCPP_EXTERN_TEMPLATE_INLINE_VISIBILITY
@@ -294,7 +290,7 @@ public:
 };
 
 template <class _CharT, class _Traits>
-class _LIBCPP_TYPE_VIS_ONLY basic_istream<_CharT, _Traits>::sentry
+class _LIBCPP_TEMPLATE_VIS basic_istream<_CharT, _Traits>::sentry
 {
     bool __ok_;
 
@@ -337,7 +333,7 @@ basic_istream<_CharT, _Traits>::sentry::sentry(basic_istream<_CharT, _Traits>& _
         __is.setstate(ios_base::failbit);
 }
 
-#ifndef _LIBCPP_HAS_NO_RVALUE_REFERENCES
+#ifndef _LIBCPP_CXX03_LANG
 
 template <class _CharT, class _Traits>
 basic_istream<_CharT, _Traits>::basic_istream(basic_istream&& __rhs)
@@ -355,7 +351,7 @@ basic_istream<_CharT, _Traits>::operator=(basic_istream&& __rhs)
     return *this;
 }
 
-#endif  // _LIBCPP_HAS_NO_RVALUE_REFERENCES
+#endif  // _LIBCPP_CXX03_LANG
 
 template <class _CharT, class _Traits>
 basic_istream<_CharT, _Traits>::~basic_istream()
@@ -1429,7 +1425,7 @@ ws(basic_istream<_CharT, _Traits>& __is)
     return __is;
 }
 
-#ifndef _LIBCPP_HAS_NO_RVALUE_REFERENCES
+#ifndef _LIBCPP_CXX03_LANG
 
 template <class _CharT, class _Traits, class _Tp>
 inline _LIBCPP_INLINE_VISIBILITY
@@ -1440,10 +1436,10 @@ operator>>(basic_istream<_CharT, _Traits>&& __is, _Tp&& __x)
     return __is;
 }
 
-#endif  // _LIBCPP_HAS_NO_RVALUE_REFERENCES
+#endif  // _LIBCPP_CXX03_LANG
 
 template <class _CharT, class _Traits>
-class _LIBCPP_TYPE_VIS_ONLY basic_iostream
+class _LIBCPP_TEMPLATE_VIS basic_iostream
     : public basic_istream<_CharT, _Traits>,
       public basic_ostream<_CharT, _Traits>
 {
@@ -1463,13 +1459,11 @@ public:
 
     virtual ~basic_iostream();
 protected:
-#ifndef _LIBCPP_HAS_NO_RVALUE_REFERENCES
+#ifndef _LIBCPP_CXX03_LANG
     inline _LIBCPP_INLINE_VISIBILITY
     basic_iostream(basic_iostream&& __rhs);
-#endif
 
     // assign/swap
-#ifndef _LIBCPP_HAS_NO_RVALUE_REFERENCES
     inline _LIBCPP_INLINE_VISIBILITY
     basic_iostream& operator=(basic_iostream&& __rhs);
 #endif
@@ -1479,7 +1473,7 @@ protected:
 public:
 };
 
-#ifndef _LIBCPP_HAS_NO_RVALUE_REFERENCES
+#ifndef _LIBCPP_CXX03_LANG
 
 template <class _CharT, class _Traits>
 basic_iostream<_CharT, _Traits>::basic_iostream(basic_iostream&& __rhs)
@@ -1495,7 +1489,7 @@ basic_iostream<_CharT, _Traits>::operator=(basic_iostream&& __rhs)
     return *this;
 }
 
-#endif  // _LIBCPP_HAS_NO_RVALUE_REFERENCES
+#endif  // _LIBCPP_CXX03_LANG
 
 template <class _CharT, class _Traits>
 basic_iostream<_CharT, _Traits>::~basic_iostream()
@@ -1612,7 +1606,7 @@ getline(basic_istream<_CharT, _Traits>& __is,
     return getline(__is, __str, __is.widen('\n'));
 }
 
-#ifndef _LIBCPP_HAS_NO_RVALUE_REFERENCES
+#ifndef _LIBCPP_CXX03_LANG
 
 template<class _CharT, class _Traits, class _Allocator>
 inline _LIBCPP_INLINE_VISIBILITY
@@ -1632,7 +1626,7 @@ getline(basic_istream<_CharT, _Traits>&& __is,
     return getline(__is, __str, __is.widen('\n'));
 }
 
-#endif  // _LIBCPP_HAS_NO_RVALUE_REFERENCES
+#endif  // _LIBCPP_CXX03_LANG
 
 template <class _CharT, class _Traits, size_t _Size>
 basic_istream<_CharT, _Traits>&
@@ -1647,7 +1641,7 @@ operator>>(basic_istream<_CharT, _Traits>& __is, bitset<_Size>& __x)
         {
             basic_string<_CharT, _Traits> __str;
             const ctype<_CharT>& __ct = use_facet<ctype<_CharT> >(__is.getloc());
-            streamsize __c = 0;
+            size_t __c = 0;
             ios_base::iostate __err = ios_base::goodbit;
             _CharT __zero = __ct.widen('0');
             _CharT __one = __ct.widen('1');
@@ -1683,10 +1677,14 @@ operator>>(basic_istream<_CharT, _Traits>& __is, bitset<_Size>& __x)
     return __is;
 }
 
+#ifndef _LIBCPP_AVAILABILITY_NO_STREAMS_EXTERN_TEMPLATE
 _LIBCPP_EXTERN_TEMPLATE(class _LIBCPP_EXTERN_TEMPLATE_TYPE_VIS basic_istream<char>)
 _LIBCPP_EXTERN_TEMPLATE(class _LIBCPP_EXTERN_TEMPLATE_TYPE_VIS basic_istream<wchar_t>)
 _LIBCPP_EXTERN_TEMPLATE(class _LIBCPP_EXTERN_TEMPLATE_TYPE_VIS basic_iostream<char>)
+#endif
 
 _LIBCPP_END_NAMESPACE_STD
+
+_LIBCPP_POP_MACROS
 
 #endif  // _LIBCPP_ISTREAM

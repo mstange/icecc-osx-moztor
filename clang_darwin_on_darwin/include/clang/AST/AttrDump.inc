@@ -53,6 +53,12 @@
     }
     break;
   }
+  case attr::AVRInterrupt: {
+    break;
+  }
+  case attr::AVRSignal: {
+    break;
+  }
   case attr::AbiTag: {
     const auto *SA = cast<AbiTagAttr>(A);
     for (const auto &Val : SA->tags())
@@ -100,6 +106,17 @@
       dumpType(SA->getAlignmentType()->getType());
     break;
   }
+  case attr::AllocAlign: {
+    const auto *SA = cast<AllocAlignAttr>(A);
+    OS << " " << SA->getParamIndex();
+    break;
+  }
+  case attr::AllocSize: {
+    const auto *SA = cast<AllocSizeAttr>(A);
+    OS << " " << SA->getElemSizeParam();
+    OS << " " << SA->getNumElemsParam();
+    break;
+  }
   case attr::AlwaysInline: {
     OS << " " << A->getSpelling();
     break;
@@ -113,6 +130,9 @@
     break;
   }
   case attr::AnyX86Interrupt: {
+    break;
+  }
+  case attr::AnyX86NoCallerSavedRegisters: {
     break;
   }
   case attr::ArcWeakrefUnavailable: {
@@ -135,7 +155,8 @@
   case attr::AssertCapability: {
     OS << " " << A->getSpelling();
     const auto *SA = cast<AssertCapabilityAttr>(A);
-    dumpStmt(SA->getExpr());
+    for (AssertCapabilityAttr::args_iterator I = SA->args_begin(), E = SA->args_end(); I != E; ++I)
+      dumpStmt(*I);
     break;
   }
   case attr::AssertExclusiveLock: {
@@ -295,6 +316,9 @@
   case attr::ConsumableSetOnRead: {
     break;
   }
+  case attr::Convergent: {
+    break;
+  }
   case attr::DLLExport: {
     break;
   }
@@ -312,6 +336,23 @@
     OS << " " << SA->getPriority();
     break;
   }
+  case attr::DiagnoseIf: {
+    const auto *SA = cast<DiagnoseIfAttr>(A);
+    OS << " \"" << SA->getMessage() << "\"";
+    switch(SA->getDiagnosticType()) {
+    case DiagnoseIfAttr::DT_Error:
+      OS << " DT_Error";
+      break;
+    case DiagnoseIfAttr::DT_Warning:
+      OS << " DT_Warning";
+      break;
+    }
+    if (SA->getArgDependent()) OS << " ArgDependent";
+    OS << " ";
+    dumpBareDeclRef(SA->getParent());
+    dumpStmt(SA->getCond());
+    break;
+  }
   case attr::DisableTailCalls: {
     break;
   }
@@ -324,11 +365,30 @@
     dumpStmt(SA->getCond());
     break;
   }
+  case attr::EnumExtensibility: {
+    const auto *SA = cast<EnumExtensibilityAttr>(A);
+    switch(SA->getExtensibility()) {
+    case EnumExtensibilityAttr::Closed:
+      OS << " Closed";
+      break;
+    case EnumExtensibilityAttr::Open:
+      OS << " Open";
+      break;
+    }
+    break;
+  }
   case attr::ExclusiveTrylockFunction: {
     const auto *SA = cast<ExclusiveTrylockFunctionAttr>(A);
     dumpStmt(SA->getSuccessValue());
     for (ExclusiveTrylockFunctionAttr::args_iterator I = SA->args_begin(), E = SA->args_end(); I != E; ++I)
       dumpStmt(*I);
+    break;
+  }
+  case attr::ExternalSourceSymbol: {
+    const auto *SA = cast<ExternalSourceSymbolAttr>(A);
+    OS << " \"" << SA->getLanguage() << "\"";
+    OS << " \"" << SA->getDefinedIn() << "\"";
+    if (SA->getGeneratedDeclaration()) OS << " GeneratedDeclaration";
     break;
   }
   case attr::FallThrough: {
@@ -503,6 +563,9 @@
   case attr::MayAlias: {
     break;
   }
+  case attr::MicroMips: {
+    break;
+  }
   case attr::MinSize: {
     break;
   }
@@ -542,6 +605,14 @@
     }
     break;
   }
+  case attr::MipsLongCall: {
+    OS << " " << A->getSpelling();
+    break;
+  }
+  case attr::MipsShortCall: {
+    OS << " " << A->getSpelling();
+    break;
+  }
   case attr::Mode: {
     const auto *SA = cast<ModeAttr>(A);
     OS << " " << SA->getMode()->getName();
@@ -577,10 +648,16 @@
   case attr::NoDuplicate: {
     break;
   }
+  case attr::NoEscape: {
+    break;
+  }
   case attr::NoInline: {
     break;
   }
   case attr::NoInstrumentFunction: {
+    break;
+  }
+  case attr::NoMicroMips: {
     break;
   }
   case attr::NoMips16: {
@@ -611,6 +688,11 @@
     break;
   }
   case attr::NotTailCalled: {
+    break;
+  }
+  case attr::OMPCaptureKind: {
+    const auto *SA = cast<OMPCaptureKindAttr>(A);
+    OS << " " << SA->getCaptureKind();
     break;
   }
   case attr::OMPCaptureNoInit: {
@@ -743,8 +825,16 @@
   case attr::ObjCRuntimeVisible: {
     break;
   }
+  case attr::ObjCSubclassingRestricted: {
+    break;
+  }
   case attr::OpenCLAccess: {
     OS << " " << A->getSpelling();
+    break;
+  }
+  case attr::OpenCLIntelReqdSubGroupSize: {
+    const auto *SA = cast<OpenCLIntelReqdSubGroupSizeAttr>(A);
+    OS << " " << SA->getSubGroupSize();
     break;
   }
   case attr::OpenCLKernel: {
@@ -810,6 +900,26 @@
     }
     break;
   }
+  case attr::PragmaClangBSSSection: {
+    const auto *SA = cast<PragmaClangBSSSectionAttr>(A);
+    OS << " \"" << SA->getName() << "\"";
+    break;
+  }
+  case attr::PragmaClangDataSection: {
+    const auto *SA = cast<PragmaClangDataSectionAttr>(A);
+    OS << " \"" << SA->getName() << "\"";
+    break;
+  }
+  case attr::PragmaClangRodataSection: {
+    const auto *SA = cast<PragmaClangRodataSectionAttr>(A);
+    OS << " \"" << SA->getName() << "\"";
+    break;
+  }
+  case attr::PragmaClangTextSection: {
+    const auto *SA = cast<PragmaClangTextSectionAttr>(A);
+    OS << " \"" << SA->getName() << "\"";
+    break;
+  }
   case attr::PreserveAll: {
     break;
   }
@@ -825,6 +935,9 @@
     break;
   }
   case attr::Pure: {
+    break;
+  }
+  case attr::RegCall: {
     break;
   }
   case attr::ReleaseCapability: {
@@ -920,6 +1033,12 @@
     break;
   }
   case attr::StdCall: {
+    break;
+  }
+  case attr::Suppress: {
+    const auto *SA = cast<SuppressAttr>(A);
+    for (const auto &Val : SA->diagnosticIdentifiers())
+      OS << " " << Val;
     break;
   }
   case attr::SwiftCall: {
@@ -1092,6 +1211,11 @@
   }
   case attr::XRayInstrument: {
     OS << " " << A->getSpelling();
+    break;
+  }
+  case attr::XRayLogArgs: {
+    const auto *SA = cast<XRayLogArgsAttr>(A);
+    OS << " " << SA->getArgumentCount();
     break;
   }
   }

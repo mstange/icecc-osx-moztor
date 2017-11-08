@@ -8,6 +8,9 @@
 /* Bug report URL. */
 #define BUG_REPORT_URL "http://llvm.org/bugs/"
 
+/* Default linker to use. */
+#define CLANG_DEFAULT_LINKER ""
+
 /* Default C++ stdlib to use. */
 #define CLANG_DEFAULT_CXX_STDLIB ""
 
@@ -16,6 +19,9 @@
 
 /* Default OpenMP runtime used by -fopenmp. */
 #define CLANG_DEFAULT_OPENMP_RUNTIME "libomp"
+
+/* Default architecture for OpenMP offloading to Nvidia GPUs. */
+#define CLANG_OPENMP_NVPTX_DEFAULT_ARCH "sm_30"
 
 /* Multilib suffix for libdir. */
 #define CLANG_LIBDIR_SUFFIX ""
@@ -35,19 +41,27 @@
 /* Define if we have libxml2 */
 #define CLANG_HAVE_LIBXML 1
 
+/* Define if we have z3 and want to build it */
+/* #undef CLANG_ANALYZER_WITH_Z3 */
+
 /* Define if we have sys/resource.h (rlimits) */
 #define CLANG_HAVE_RLIMITS 1
 
 /* The LLVM product name and version */
-#define BACKEND_PACKAGE_STRING "LLVM 4.0.0svn"
+#define BACKEND_PACKAGE_STRING "LLVM 6.0.0svn"
 
 /* Linker version detected at compile time. */
-#define HOST_LINK_VERSION "274.1"
+#define HOST_LINK_VERSION "302.3.1"
 
 /* pass --build-id to ld */
 /* #undef ENABLE_LINKER_BUILD_ID */
 
 /* enable x86 relax relocations by default */
 #define ENABLE_X86_RELAX_RELOCATIONS 0
+
+/* Enable each functionality of modules */
+#define CLANG_ENABLE_ARCMT 1
+#define CLANG_ENABLE_OBJC_REWRITER 1
+#define CLANG_ENABLE_STATIC_ANALYZER 1
 
 #endif

@@ -23,6 +23,7 @@
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -42,8 +43,10 @@ class DiagnosticsEngine;
 class LangOptions;
 class CodeGenOptions;
 class MacroBuilder;
+class QualType;
 class SourceLocation;
 class SourceManager;
+class Type;
 
 namespace Builtin { struct Info; }
 
@@ -76,13 +79,14 @@ protected:
   unsigned short MaxVectorAlign;
   unsigned short MaxTLSAlign;
   unsigned short SimdDefaultAlign;
+  unsigned short NewAlign;
   std::unique_ptr<llvm::DataLayout> DataLayout;
   const char *MCountName;
   const llvm::fltSemantics *HalfFormat, *FloatFormat, *DoubleFormat,
     *LongDoubleFormat, *Float128Format;
   unsigned char RegParmMax, SSERegParmMax;
   TargetCXXABI TheCXXABI;
-  const LangAS::Map *AddrSpaceMap;
+  const LangASMap *AddrSpaceMap;
 
   mutable StringRef PlatformName;
   mutable VersionTuple PlatformMinVersion;
@@ -152,7 +156,7 @@ public:
     /// typedef void* __builtin_va_list;
     VoidPtrBuiltinVaList,
 
-    /// __builtin_va_list as defind by the AArch64 ABI
+    /// __builtin_va_list as defined by the AArch64 ABI
     /// http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055a/IHI0055A_aapcs64.pdf
     AArch64ABIBuiltinVaList,
 
@@ -166,7 +170,7 @@ public:
     PowerABIBuiltinVaList,
 
     /// __builtin_va_list as defined by the x86-64 ABI:
-    /// http://www.x86-64.org/documentation/abi.pdf
+    /// http://refspecs.linuxbase.org/elf/x86_64-abi-0.21.pdf
     X86_64ABIBuiltinVaList,
 
     /// __builtin_va_list as defined by ARM AAPCS ABI
@@ -223,12 +227,29 @@ protected:
 
 public:
   IntType getSizeType() const { return SizeType; }
+  IntType getSignedSizeType() const {
+    switch (SizeType) {
+    case UnsignedShort:
+      return SignedShort;
+    case UnsignedInt:
+      return SignedInt;
+    case UnsignedLong:
+      return SignedLong;
+    case UnsignedLongLong:
+      return SignedLongLong;
+    default:
+      llvm_unreachable("Invalid SizeType");
+    }
+  }
   IntType getIntMaxType() const { return IntMaxType; }
   IntType getUIntMaxType() const {
     return getCorrespondingUnsignedType(IntMaxType);
   }
   IntType getPtrDiffType(unsigned AddrSpace) const {
     return AddrSpace == 0 ? PtrDiffType : getPtrDiffTypeV(AddrSpace);
+  }
+  IntType getUnsignedPtrDiffType(unsigned AddrSpace) const {
+    return getCorrespondingUnsignedType(getPtrDiffType(AddrSpace));
   }
   IntType getIntPtrType() const { return IntPtrType; }
   IntType getUIntPtrType() const {
@@ -299,6 +320,10 @@ public:
     return PointerWidth;
   }
 
+  /// \brief Get integer value for null pointer.
+  /// \param AddrSpace address space of pointee in source language.
+  virtual uint64_t getNullPointerValue(LangAS AddrSpace) const { return 0; }
+
   /// \brief Return the size of '_Bool' and C++ 'bool' for this target, in bits.
   unsigned getBoolWidth() const { return BoolWidth; }
 
@@ -352,6 +377,13 @@ public:
   /// getMinGlobalAlign - Return the minimum alignment of a global variable,
   /// unless its alignment is explicitly reduced via attributes.
   unsigned getMinGlobalAlign() const { return MinGlobalAlign; }
+
+  /// Return the largest alignment for which a suitably-sized allocation with
+  /// '::operator new(size_t)' is guaranteed to produce a correctly-aligned
+  /// pointer.
+  unsigned getNewAlign() const {
+    return NewAlign ? NewAlign : std::max(LongDoubleAlign, LongLongAlign);
+  }
 
   /// getWCharWidth/Align - Return the size of 'wchar_t' for this target, in
   /// bits.
@@ -417,6 +449,9 @@ public:
   /// \brief Return the maximum width lock-free atomic operation which can be
   /// inlined given the supported features of the given target.
   unsigned getMaxAtomicInlineWidth() const { return MaxAtomicInlineWidth; }
+  /// \brief Set the maximum inline or promote width lock-free atomic operation
+  /// for the given target.
+  virtual void setMaxAtomicWidth() {}
   /// \brief Returns true if the given target supports lock-free atomic
   /// operations at the specified width and alignment.
   virtual bool hasBuiltinAtomic(uint64_t AtomicSizeInBits,
@@ -433,21 +468,6 @@ public:
   /// value is type-specific, but this alignment can be used for most of the
   /// types for the given target.
   unsigned getSimdDefaultAlign() const { return SimdDefaultAlign; }
-
-  /// Return the alignment (in bits) of the thrown exception object. This is
-  /// only meaningful for targets that allocate C++ exceptions in a system
-  /// runtime, such as those using the Itanium C++ ABI.
-  virtual unsigned getExnObjectAlignment() const {
-    // Itanium says that an _Unwind_Exception has to be "double-word"
-    // aligned (and thus the end of it is also so-aligned), meaning 16
-    // bytes.  Of course, that was written for the actual Itanium,
-    // which is a 64-bit platform.  Classically, the ABI doesn't really
-    // specify the alignment on other platforms, but in practice
-    // libUnwind declares the struct with __attribute__((aligned)), so
-    // we assume that alignment here.  (It's generally 16 bytes, but
-    // some targets overwrite it.)
-    return getDefaultAlignForAttributeAligned();
-  }
 
   /// \brief Return the size of intmax_t and uintmax_t for this target, in bits.
   unsigned getIntMaxTWidth() const {
@@ -590,8 +610,16 @@ public:
 
   /// \brief Returns the "normalized" GCC register name.
   ///
-  /// For example, on x86 it will return "ax" when "eax" is passed in.
-  StringRef getNormalizedGCCRegisterName(StringRef Name) const;
+  /// ReturnCannonical true will return the register name without any additions
+  /// such as "{}" or "%" in it's canonical form, for example:
+  /// ReturnCanonical = true and Name = "rax", will return "ax".
+  StringRef getNormalizedGCCRegisterName(StringRef Name,
+                                         bool ReturnCanonical = false) const;
+ 
+  virtual StringRef getConstraintRegister(const StringRef &Constraint,
+                                          const StringRef &Expression) const {
+    return "";
+  }
 
   struct ConstraintInfo {
     enum {
@@ -800,8 +828,9 @@ public:
   /// \brief Set forced language options.
   ///
   /// Apply changes to the target information with respect to certain
-  /// language options which change the target configuration.
-  virtual void adjust(const LangOptions &Opts);
+  /// language options which change the target configuration and adjust
+  /// the language based on the target options where applicable.
+  virtual void adjust(LangOptions &Opts);
 
   /// \brief Adjust target options based on codegen options.
   virtual void adjustTargetOptions(const CodeGenOptions &CGOpts,
@@ -830,6 +859,11 @@ public:
     return false;
   }
 
+  /// brief Determine whether this TargetInfo supports the given CPU name.
+  virtual bool isValidCPUName(StringRef Name) const {
+    return true;
+  }
+
   /// \brief Use the specified ABI.
   ///
   /// \return False on error (invalid ABI name).
@@ -850,6 +884,11 @@ public:
                                  StringRef Name,
                                  bool Enabled) const {
     Features[Name] = Enabled;
+  }
+
+  /// \brief Determine whether this TargetInfo supports the given feature.
+  virtual bool isValidFeatureName(StringRef Feature) const {
+    return true;
   }
 
   /// \brief Perform initialization based on the user configured
@@ -876,6 +915,10 @@ public:
   // \brief Validate the contents of the __builtin_cpu_supports(const char*)
   // argument.
   virtual bool validateCpuSupports(StringRef Name) const { return false; }
+
+  // \brief Validate the contents of the __builtin_cpu_is(const char*)
+  // argument.
+  virtual bool validateCpuIs(StringRef Name) const { return false; }
 
   // \brief Returns maximal number of args passed in registers.
   unsigned getRegParmMax() const {
@@ -926,8 +969,14 @@ public:
     return nullptr;
   }
 
-  const LangAS::Map &getAddressSpaceMap() const {
-    return *AddrSpaceMap;
+  const LangASMap &getAddressSpaceMap() const { return *AddrSpaceMap; }
+
+  /// \brief Return an AST address space which can be used opportunistically
+  /// for constant global memory. It must be possible to convert pointers into
+  /// this address space to LangAS::Default. If no such address space exists,
+  /// this may return None, and such optimizations will be disabled.
+  virtual llvm::Optional<LangAS> getConstantAddressSpace() const {
+    return LangAS::Default;
   }
 
   /// \brief Retrieve the name of the platform as it is used in the
@@ -981,11 +1030,18 @@ public:
     return false;
   }
 
-  /// \brief Whether target allows to overalign ABI-specified prefered alignment
+  /// \brief Whether target allows to overalign ABI-specified preferred alignment
   virtual bool allowsLargerPreferedTypeAlignment() const { return true; }
 
   /// \brief Set supported OpenCL extensions and optional core features.
   virtual void setSupportedOpenCLOpts() {}
+
+  /// \brief Set supported OpenCL extensions as written on command line
+  virtual void setOpenCLExtensionOpts() {
+    for (const auto &Ext : getTargetOpts().OpenCLExtensionsAsWritten) {
+      getTargetOpts().SupportedOpenCLOptions.support(Ext);
+    }
+  }
 
   /// \brief Get supported OpenCL extensions and optional core features.
   OpenCLOptions &getSupportedOpenCLOpts() {
@@ -997,9 +1053,22 @@ public:
       return getTargetOpts().SupportedOpenCLOptions;
   }
 
-  /// \brief Get OpenCL image type address space.
-  virtual LangAS::ID getOpenCLImageAddrSpace() const {
-    return LangAS::opencl_global;
+  /// \brief Get address space for OpenCL type.
+  virtual LangAS getOpenCLTypeAddrSpace(const Type *T) const;
+
+  /// \returns Target specific vtbl ptr address space.
+  virtual unsigned getVtblPtrAddressSpace() const {
+    return 0;
+  }
+
+  /// \returns If a target requires an address within a target specific address
+  /// space \p AddressSpace to be converted in order to be used, then return the
+  /// corresponding target specific DWARF address space.
+  ///
+  /// \returns Otherwise return None and no conversion will be emitted in the
+  /// DWARF.
+  virtual Optional<unsigned> getDWARFAddressSpace(unsigned AddressSpace) const {
+    return None;
   }
 
   /// \brief Check the target is valid after it is fully initialized.
