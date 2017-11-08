@@ -109,7 +109,7 @@ First, prepare the Linux compiler bundle:
     ```
     mkdir build
     cd build
-    CC=~/.bin/gcc CXX=~/.bin/g++ cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-apple-darwin16.0.0 -DCMAKE_INSTALL_PREFIX:PATH=~/code/clang_darwin_on_linux/      ../llvm
+    CC=~/.bin/gcc CXX=~/.bin/g++ cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-apple-darwin16.0.0 -DCMAKE_INSTALL_PREFIX:PATH=~/code/clang_darwin_on_linux/ ../llvm
     ninja -j100 && ninja install
     ```
 
@@ -139,14 +139,38 @@ First, prepare the Linux compiler bundle:
 
 Now it's time to compile clang for macOS.
 
-1. Clone llvm on macOS and `svn up -r ...` to the same revision.
-2. You also need the subrepos `llvm/tools/clang` and `llvm/projects/libcxx`. (The latter was not needed on Linux.)
-3. Build clang on macOS. I used this command:
+1. Clone llvm on macOS and `svn up -r ...` to the same revision as on Linux:
 
    ```
-   cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-apple-darwin16.0.0 -DDEFAULT_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/ -DCMAKE_INSTALL_PREFIX:PATH=~/code/clang_darwin_on_darwin/ ../llvm
-   ninja -j100 && ninja install
+   svn co http://llvm.org/svn/llvm-project/llvm/trunk llvm
+   cd llvm/
+   svn up -r therevision
+   cd ..
    ```
+
+2. You also need the subrepos `llvm/tools/clang` and `llvm/projects/libcxx`. (The latter was not needed on Linux.)
+
+   ```
+   cd llvm/tools/
+   svn co http://llvm.org/svn/llvm-project/cfe/trunk clang
+   cd clang
+   svn up -r therevision
+   cd ../../projects/
+   svn co http://llvm.org/svn/llvm-project/libcxx/trunk libcxx
+   cd libcxx
+   svn up -r therevision
+   cd ../../..
+   ```
+
+3. Build clang on macOS. I used these commands (which will produce a clang installation at `~/code/clang_darwin_on_darwin/`):
+
+   ```
+   mkdir build
+   cd build
+   cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-apple-darwin16.0.0 -DDEFAULT_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/ -DCMAKE_INSTALL_PREFIX:PATH=~/code/clang_darwin_on_darwin/ ../llvm
+   ninja -j8 && ninja install
+   ```
+
 4. Replace the `clang_darwin_on_darwin` directory in this directory with the one that the previous build command produced in `~/code/`.
 
-This concludes the update. You can commit and push your changes now.
+This concludes the update. You can now adjust the llvm revision mentioned in this readme (at the start of this section), and commit and push your changes.
