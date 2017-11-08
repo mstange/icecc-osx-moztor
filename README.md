@@ -93,16 +93,19 @@ First, prepare the Linux compiler bundle:
 1. [Clone the llvm repo](http://clang.llvm.org/get_started.html) on Linux using `svn co http://llvm.org/svn/llvm-project/llvm/trunk llvm`,
    or `svn up` your existing clone.
 2. You also need clone or update the clang subrepo at `llvm/tools/clang`:
+
    ```
 cd llvm/tools
 svn co http://llvm.org/svn/llvm-project/cfe/trunk clang
 cd ../..
 ```
+
 3. Build clang. This should be done in a `build` directory next to the `llvm`
    directory, using CMake.
   Here are the commands I used to do this. I'm specifying `~/code/clang_darwin_on_linux/ `
   as the install path. I also have icecream compiler wrapper scripts in `~/.bin/`,
   so I'm using an existing icecream setup on the Linux machine to compile clang.
+
    ```
 mkdir build
 cd build
